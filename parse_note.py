@@ -10,6 +10,7 @@ import numpy as np
 import json
 import urllib.request
 import yaml
+from download_files import download
 
 
 with open("config.yaml", "r") as s:
@@ -23,7 +24,7 @@ with open("colors.yaml", "r") as s:
 PAGE_WIDTH = 8.5
 Q_COLOR = color_map[config["question_color"]]
 A_COLOR = color_map[config["answer_color"]]
-TARGET_DECK = config.get("target_deck", "default")
+TARGET_DECK = config.get("target_deck", "Default")
 CONVERT_TO_BLACK = config.get("convert_to_black", True)
 
 PATH = Path(__file__).parent.absolute()
@@ -53,14 +54,14 @@ def invoke(action, **params):
 def unpack_struct(string, fmt, size):
     return struct.unpack('{num}{format}'.format(num=int(len(string)/size), format=fmt), string)
 
-def handwriting_to_anki(sessions_plist_path, q_color = Q_COLOR, a_color = Q_COLOR):
+def handwriting_to_anki(sessions_plist_path, deckname = TARGET_DECK, q_color = Q_COLOR, a_color = Q_COLOR):
     cards = parse_note(sessions_plist_path, q_color = Q_COLOR, a_color = A_COLOR)
     #TODO(agro): skip hash
     for card in cards:
         print(card.front_image_path)
         print(card.front_image_path.split("/")[-1])
         note = {
-            "deckName": "Default",
+            "deckName": deckname,
             "modelName": "Basic",
             "fields": {
                         "Front": "\\( \\)",
@@ -199,26 +200,36 @@ def plot_curve(name, curve, color, scale_factor = 8.5/574):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Turn a .note file into Anki questions")
+    parser = argparse.ArgumentParser(description="Turn a .note file from google drive into anki questions")
     parser.add_argument(
-        '-p',
-        "--path",
+        '-n',
+        "--name",
         nargs = "?",
         required=True,
-        help = "path to the .note file"
+        help = "The name of the .note file on your google drive."
     )
+    parser.add_argument(
+        '-d',
+        "--deck",
+        nargs = "?",
+        default = TARGET_DECK,
+        help = "The deck to add the cards to"
+    )
+
     args = parser.parse_args()
-    path = args.path
+    name = args.name
 
     if not os.path.isdir(f"{PATH}/temp/"):
         os.mkdir(f"{PATH}/temp/")
 
-    filename = path.split("/")[-1]
-    filename = filename.split(".")[0]
+    download(name, f"{PATH}/temp/")
 
-    with zipfile.ZipFile(path, "r") as zip_ref:
+
+    with zipfile.ZipFile(f"{PATH}/temp/{name}", "r") as zip_ref:
         zip_ref.extractall(f"{PATH}/temp/")
+
+    name = name.split(".")[0]
         
     # TODO(agro): fix this so it works with renamed .note files
-    note_data = f"{PATH}/temp/{filename}/Session.plist" 
-    handwriting_to_anki(note_data)
+    note_data = f"{PATH}/temp/{name}/Session.plist" 
+    handwriting_to_anki(note_data, deckname=args.deck)
