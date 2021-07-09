@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import matplotlib.pyplot as plt
 from pathlib import Path
 import os
@@ -8,10 +9,22 @@ import zipfile
 import numpy as np
 import json
 import urllib.request
+import yaml
+
+
+with open("config.yaml", "r") as s:
+    config = yaml.load(s, yaml.Loader)
+    assert "question_color" in config
+    assert "answer_color" in config
+
+with open("colors.yaml", "r") as s:
+    color_map = yaml.load(s, yaml.Loader)
 
 PAGE_WIDTH = 8.5
-RED = [0.7098039215686275, 0.08235294117647059, 0.08235294117647059, 1.0]
-BLUE = [0.26666666666666666, 0.30980392156862746, 0.6784313725490196, 1.0]
+Q_COLOR = color_map[config["question_color"]]
+A_COLOR = color_map[config["answer_color"]]
+TARGET_DECK = config.get("target_deck", "default")
+CONVERT_TO_BLACK = config.get("convert_to_black", True)
 
 PATH = Path(__file__).parent.absolute()
 
@@ -40,8 +53,8 @@ def invoke(action, **params):
 def unpack_struct(string, fmt, size):
     return struct.unpack('{num}{format}'.format(num=int(len(string)/size), format=fmt), string)
 
-def handwriting_to_anki(sessions_plist_path):
-    cards = parse_note(sessions_plist_path)
+def handwriting_to_anki(sessions_plist_path, q_color = Q_COLOR, a_color = Q_COLOR):
+    cards = parse_note(sessions_plist_path, q_color = Q_COLOR, a_color = A_COLOR)
     #TODO(agro): skip hash
     for card in cards:
         print(card.front_image_path)
@@ -74,7 +87,7 @@ def handwriting_to_anki(sessions_plist_path):
         }
         invoke('addNote', note=note)
 
-def parse_note(sessions_plist_path):
+def parse_note(sessions_plist_path, q_color, a_color, convert_to_black = CONVERT_TO_BLACK):
 
     if not os.path.isdir(f"{PATH}/temp/"):
         os.mkdir(f"{PATH}/temp/")
@@ -102,65 +115,64 @@ def parse_note(sessions_plist_path):
     x = 0
     y = 0
     ind = 0
-    red_curves = []
-    blue_curves = []
-    curr_red_curve = []
-    curr_blue_curve = []
-    last_color = "black"
+    q_curves = []
+    a_curves = []
+    curr_q_curve = []
+    curr_a_curve = []
+    last_type = "T"
     for i, curve_len in enumerate(num_points):
         color = colors[i]
         max_x = x + curve_len
         max_y = y + curve_len
         max_ind = ind + curve_len*2
-        if np.all(np.isclose(color, RED)):
+        if np.all(np.isclose(color, q_color)):
             # question
-            if last_color == "blue":
-                blue_curves.append(curr_blue_curve)
-                curr_blue_curve = []
-            curr_red_curve.append(points[ind:max_ind])
-            last_color = "red"
-        elif np.all(np.isclose(color, BLUE)):
+            if last_type == "A":
+                a_curves.append(curr_a_curve)
+                curr_a_curve = []
+            curr_q_curve.append(points[ind:max_ind])
+            last_type = "Q"
+        elif np.all(np.isclose(color, a_color)):
             # answer
-            if last_color == "red":
-                red_curves.append(curr_red_curve)
-                curr_red_curve = []
-            curr_blue_curve.append(points[ind:max_ind])
-            last_color = "blue"
+            if last_type == "Q":
+                q_curves.append(curr_q_curve)
+                curr_q_curve = []
+            curr_a_curve.append(points[ind:max_ind])
+            last_type = "A"
         else:
-            if last_color == "red":
-                red_curves.append(curr_red_curve)
-                curr_red_curve = []
-            elif last_color == "blue":
-                blue_curves.append(curr_blue_curve)
-                curr_blue_curve = []
-            last_color = "black"
+            if last_type == "Q":
+                q_curves.append(curr_q_curve)
+                curr_q_curve = []
+            elif last_type == "A":
+                a_curves.append(curr_a_curve)
+                curr_a_curve = []
+            last_type = "T"
         current_x = max_x
         current_y = max_y
         ind = max_ind
-    if last_color == "red":
-        red_curves.append(curr_red_curve)
-        curr_red_curve = []
-    elif last_color == "blue":
-        blue_curves.append(curr_blue_curve)
-        curr_blue_curve = []
+    if last_type == "Q":
+        q_curves.append(curr_q_curve)
+    elif last_type == "A":
+        a_curves.append(curr_a_curve)
 
-    assert(len(red_curves) == len(blue_curves)), "Mismatched Q/A's"
-
+    assert(len(q_curves) == len(a_curves)), "Mismatched Q/A's"
     
     res = []
     i = 0
-    for red_curve, blue_curve in zip(red_curves, blue_curves):
+    for q_curve, a_curve in zip(q_curves, a_curves):
         Q = f"{PATH}/temp/Q{i}.png"
-        A = f"{PATH}/temp/B{i}.png"
-        plot_curve(Q, red_curve, RED, scale_factor= scale_factor)
-        plot_curve(A, blue_curve, BLUE, scale_factor= scale_factor)
+        A = f"{PATH}/temp/A{i}.png"
+        if convert_to_black:
+            q_color = a_color = [0,0,0,1]
+        plot_curve(Q, q_curve, q_color, scale_factor= scale_factor)
+        plot_curve(A, a_curve, a_color, scale_factor= scale_factor)
         i += 1
         res.append(Card(Q, A))
 
     return res
 
 
-def plot_curve(name, curve, color, scale_factor = 8.5/784):
+def plot_curve(name, curve, color, scale_factor = 8.5/574):
 
     points = []
     for subcurve in curve:
@@ -187,18 +199,26 @@ def plot_curve(name, curve, color, scale_factor = 8.5/784):
 
 if __name__ == "__main__":
 
-    infile = "TestAnki2.note"
-    print(PATH)
-
-    if ".note" in infile:
-        filename = infile.split(".")[0]
+    parser = argparse.ArgumentParser(description="Turn a .note file into Anki questions")
+    parser.add_argument(
+        '-p',
+        "--path",
+        nargs = "?",
+        required=True,
+        help = "path to the .note file"
+    )
+    args = parser.parse_args()
+    path = args.path
 
     if not os.path.isdir(f"{PATH}/temp/"):
         os.mkdir(f"{PATH}/temp/")
 
-    with zipfile.ZipFile(f"{PATH}/test_files/{filename}.note", "r") as zip_ref:
-        zip_ref.extractall(f"{PATH}/temp/")
+    filename = path.split("/")[-1]
+    filename = filename.split(".")[0]
 
+    with zipfile.ZipFile(path, "r") as zip_ref:
+        zip_ref.extractall(f"{PATH}/temp/")
         
-    note_data = f"{PATH}/temp/{filename}/Session.plist"
+    # TODO(agro): fix this so it works with renamed .note files
+    note_data = f"{PATH}/temp/{filename}/Session.plist" 
     handwriting_to_anki(note_data)

@@ -1,0 +1,6 @@
+question_color: color3 # color_name in colors.yaml
+answer_color: color7 # color_name in colors.yaml
+cloze_color: color0 # color_name in colors.yaml (TODO)
+target_deck: "default"
+# convert any input handwriting to black
+convert_to_black: True

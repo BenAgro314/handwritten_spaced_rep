@@ -1,10 +1,17 @@
 # handwritten_spaced_rep
 
-Convert handwritten notes to cards in your favourite spaced repitition application.
+Convert handwritten notes to cards in your favourite spaced repetition application.
 
 ## Support:
 
 - [Notability](https://www.gingerlabs.com/) (.note files) -> Anki (requires [AnkiConnect](https://ankiweb.net/shared/info/2055492159))
+
+## Demo
+
+With anki open (and AnkiConnect installed), run 
+``` bash
+./parse_note.py --path=./test_files/Testanki3.note
+```
 
 ## Installation
 
