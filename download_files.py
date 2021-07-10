@@ -16,9 +16,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 
-
 CREDENTIALS_FILE = "credentials.json"
-
 
 def get_gdrive_service():
     creds = None

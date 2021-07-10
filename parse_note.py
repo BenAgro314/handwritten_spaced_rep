@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import sys
 import matplotlib.pyplot as plt
 from pathlib import Path
 import os
@@ -54,32 +55,36 @@ def invoke(action, **params):
 def unpack_struct(string, fmt, size):
     return struct.unpack('{num}{format}'.format(num=int(len(string)/size), format=fmt), string)
 
-def handwriting_to_anki(sessions_plist_path, deckname = TARGET_DECK, q_color = Q_COLOR, a_color = Q_COLOR):
+def handwriting_to_anki(sessions_plist_path, docname, deckname = TARGET_DECK, q_color = Q_COLOR, a_color = Q_COLOR):
     cards = parse_note(sessions_plist_path, q_color = Q_COLOR, a_color = A_COLOR)
     #TODO(agro): skip hash
-    for card in cards:
-        print(card.front_image_path)
-        print(card.front_image_path.split("/")[-1])
+    for i, card in enumerate(cards):
+        print(f"Adding card #{i} from document {docname}")
+        front_image_name = "_" + docname + "_" + card.front_image_path.split("/")[-1]
+        back_image_name = "_" + docname + "_" + card.back_image_path.split("/")[-1]
         note = {
             "deckName": deckname,
             "modelName": "Basic",
             "fields": {
                         "Front": "\\( \\)",
                         "Back": "\\( \\)",
-                        "Card ID": card.front_image_path.split("/")[-1],
                     },
+            "options": {
+                "allowDuplicate": False,
+                "duplicateScope": "deck",
+            },
             "tags": ["handwriting_to_anki"],
             "picture": [
                 {
                     "path": card.front_image_path,
-                    "filename": card.front_image_path.split("/")[-1],
+                    "filename": front_image_name,
                     "fields": [
                         "Front"
                     ]
                 },
                 {
                     "path": card.back_image_path,
-                    "filename": card.back_image_path.split("/")[-1],
+                    "filename": back_image_name,
                     "fields": [
                         "Back"
                     ]
@@ -215,6 +220,13 @@ if __name__ == "__main__":
         default = TARGET_DECK,
         help = "The deck to add the cards to"
     )
+    parser.add_argument(
+        '-f',
+        "--force",
+        nargs = "?",
+        default = False,
+        help = "Use this flag to force the card addition"
+    )
 
     args = parser.parse_args()
     name = args.name
@@ -222,9 +234,12 @@ if __name__ == "__main__":
     if not os.path.isdir(f"{PATH}/temp/"):
         os.mkdir(f"{PATH}/temp/")
 
+    if os.path.isfile(f"{PATH}/temp/{name}") and not args.force:
+        print(f"The file {name} has already been added to Anki")
+        print("Either remove the file from ./temp/ or pass -f into this script")
+        sys.exit(0)
+
     download(name, f"{PATH}/temp/")
-
-
     with zipfile.ZipFile(f"{PATH}/temp/{name}", "r") as zip_ref:
         zip_ref.extractall(f"{PATH}/temp/")
 
@@ -232,4 +247,4 @@ if __name__ == "__main__":
         
     # TODO(agro): fix this so it works with renamed .note files
     note_data = f"{PATH}/temp/{name}/Session.plist" 
-    handwriting_to_anki(note_data, deckname=args.deck)
+    handwriting_to_anki(note_data, name, deckname=args.deck)
