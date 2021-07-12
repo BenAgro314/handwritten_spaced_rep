@@ -11,15 +11,17 @@ import numpy as np
 import json
 import urllib.request
 import yaml
-from download_files import download
+from download_files import download_from_folder
 
+PATH = os.path.dirname(os.path.realpath(__file__))
 
-with open("config.yaml", "r") as s:
+with open(f"{PATH}/config/config.yaml", "r") as s:
     config = yaml.load(s, yaml.Loader)
     assert "question_color" in config
     assert "answer_color" in config
+    assert "folder_id" in config
 
-with open("colors.yaml", "r") as s:
+with open(f"{PATH}/config/colors.yaml", "r") as s:
     color_map = yaml.load(s, yaml.Loader)
 
 PAGE_WIDTH = 8.5
@@ -27,8 +29,7 @@ Q_COLOR = color_map[config["question_color"]]
 A_COLOR = color_map[config["answer_color"]]
 TARGET_DECK = config.get("target_deck", "Default")
 CONVERT_TO_BLACK = config.get("convert_to_black", True)
-
-PATH = Path(__file__).parent.absolute()
+FOLDER_ID = config["folder_id"]
 
 class Card:
 
@@ -95,8 +96,8 @@ def handwriting_to_anki(sessions_plist_path, docname, deckname = TARGET_DECK, q_
 
 def parse_note(sessions_plist_path, q_color, a_color, convert_to_black = CONVERT_TO_BLACK):
 
-    if not os.path.isdir(f"{PATH}/temp/"):
-        os.mkdir(f"{PATH}/temp/")
+    if not os.path.isdir(f"{PATH}/files/"):
+        os.mkdir(f"{PATH}/files/")
 
     plist = biplist.readPlist(sessions_plist_path)
 
@@ -166,8 +167,8 @@ def parse_note(sessions_plist_path, q_color, a_color, convert_to_black = CONVERT
     res = []
     i = 0
     for q_curve, a_curve in zip(q_curves, a_curves):
-        Q = f"{PATH}/temp/Q{i}.png"
-        A = f"{PATH}/temp/A{i}.png"
+        Q = f"{PATH}/files/Q{i}.png"
+        A = f"{PATH}/files/A{i}.png"
         if convert_to_black:
             q_color = a_color = [0,0,0,1]
         plot_curve(Q, q_curve, q_color, scale_factor= scale_factor)
@@ -206,6 +207,7 @@ def plot_curve(name, curve, color, scale_factor = 8.5/574):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Turn a .note file from google drive into anki questions")
+    """
     parser.add_argument(
         '-n',
         "--name",
@@ -213,6 +215,7 @@ if __name__ == "__main__":
         required=True,
         help = "The name of the .note file on your google drive."
     )
+    """
     parser.add_argument(
         '-d',
         "--deck",
@@ -229,22 +232,41 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    name = args.name
+    #name = args.name
 
-    if not os.path.isdir(f"{PATH}/temp/"):
-        os.mkdir(f"{PATH}/temp/")
+    if not os.path.isdir(f"{PATH}/files/"):
+        os.mkdir(f"{PATH}/files/")
 
-    if os.path.isfile(f"{PATH}/temp/{name}") and not args.force:
-        print(f"The file {name} has already been added to Anki")
-        print("Either remove the file from ./temp/ or pass -f into this script")
-        sys.exit(0)
 
-    download(name, f"{PATH}/temp/")
-    with zipfile.ZipFile(f"{PATH}/temp/{name}", "r") as zip_ref:
-        zip_ref.extractall(f"{PATH}/temp/")
+    file_paths = download_from_folder(FOLDER_ID, f"{PATH}/files/")
 
-    name = name.split(".")[0]
-        
-    # TODO(agro): fix this so it works with renamed .note files
-    note_data = f"{PATH}/temp/{name}/Session.plist" 
-    handwriting_to_anki(note_data, name, deckname=args.deck)
+    for file_path in file_paths:
+
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(f"{PATH}/files/")
+
+        name = file_path.split("/")[-1]
+        name = name.split(".")[0]
+
+        if not os.path.isfile(f"{PATH}/files/index.json"):
+            data = {"names": []}
+            with open(f"{PATH}/files/index.json", "w") as f:
+                json.dump(data, f, sort_keys=True, indent=4)
+
+        with open(f"{PATH}/files/index.json", "r") as f:
+            index = json.load(f)
+            if name in index["names"] and not args.force:
+                print(f"Failed to add {name}, a file with the same name as already been added.")
+                print("Pass --force=True to this script to override this")
+                continue
+            else:
+                index["names"].append(name)
+            
+
+            
+        # TODO(agro): fix this so it works with renamed .note files
+        note_data = f"{PATH}/files/{name}/Session.plist" 
+        handwriting_to_anki(note_data, name, deckname=args.deck)
+
+    with open(f"{PATH}/files/index.json", "w") as f:
+        json.dump(index, f)
