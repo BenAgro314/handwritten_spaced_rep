@@ -7,5 +7,5 @@
 temp/
 credentials.json
 client_secrets.json
-config/token.txt
+token.tx
 retired/
