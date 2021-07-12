@@ -18,18 +18,26 @@ gauth.SaveCredentialsFile(f"{DIR_PATH}/auth/token.txt")
 
 drive = GoogleDrive(gauth)
 
-def download_from_folder(folder_id, save_dir_path, extension = ".note", verbose = True):
+def download_from_folder(folder_id, save_dir_path, extension = ".note", verbose = True, ignore_ids = None):
     file_list = drive.ListFile(
         {'q': f"'{folder_id}' in parents and title contains '{extension}'"}
     ).GetList()
     downloaded = []
     for file1 in file_list:
+        if file1['id'] in ignore_ids:
+            continue
         title = file1['title']
         if verbose:
             print(f'Downloading {title} to {save_dir_path + title}')
         file2 = drive.CreateFile({"id": file1["id"]})
         file2.GetContentFile(save_dir_path + title)
-        downloaded.append(save_dir_path + title) 
+        downloaded.append(
+            {
+                "path": save_dir_path + title,
+                "id": file1["id"],
+
+            }
+        )
 
     return downloaded
 

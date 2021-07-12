@@ -12,7 +12,9 @@ from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
 import numpy as np
 
-with open("colors.yaml", "r") as stream:
+PATH = os.path.dirname(os.path.realpath(__file__))
+
+with open(f"{PATH}/colors.yaml", "r") as stream:
     colors_dict = yaml.load(stream, yaml.Loader)
 
 color_names = [color for color in colors_dict]
@@ -89,5 +91,5 @@ def plot_colortable(colors, names, title, sort_colors=True, emptycols=0):
     return fig
 
 plot_colortable(colors_dict, color_names, "colors", sort_colors= False)
-plt.savefig("colors.png")
+plt.savefig(f"{PATH}/colors.png")
 plt.show()

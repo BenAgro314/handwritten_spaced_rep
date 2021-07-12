@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import sys
 import matplotlib.pyplot as plt
@@ -203,6 +202,52 @@ def plot_curve(name, curve, color, scale_factor = 8.5/574):
     #plt.show()
 
 
+def sync_notes(target_deck = TARGET_DECK, force = False):
+
+    if not os.path.isdir(f"{PATH}/files/"):
+        os.mkdir(f"{PATH}/files/")
+
+
+
+    index = {"file_ids":[]}
+    if not os.path.isfile(f"{PATH}/files/index.json"):
+        with open(f"{PATH}/files/index.json", "w") as f:
+            json.dump(index, f, sort_keys=True, indent=4)
+
+    try:
+        with open(f"{PATH}/files/index.json", "r") as f:
+            index = json.load(f)
+    except:
+        print("Corrupt index.json, overwriting")
+
+    ignore_ids = [] if force else index["file_ids"]
+    file_paths = download_from_folder(FOLDER_ID, f"{PATH}/files/", ignore_ids = ignore_ids)
+
+    for file_info in file_paths:
+
+        file_path = file_info["path"]
+        file_id = file_info["id"]
+
+        name = file_path.split("/")[-1]
+        name = name.split(".")[0]
+
+        if file_id in index["file_ids"] and not force:
+            print(f"Ignoring {name}, a file with the same id has already been added")
+            print(f"Pass --force=True to sync all files")
+            continue
+        else:
+            index["file_ids"].append(file_id)
+
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(f"{PATH}/files/")
+
+        # TODO(agro): fix this so it works with renamed .note files
+        note_data = f"{PATH}/files/{name}/Session.plist" 
+        handwriting_to_anki(note_data, name, deckname=target_deck)
+
+    with open(f"{PATH}/files/index.json", "w") as f:
+        json.dump(index, f)
+
 
 if __name__ == "__main__":
 
@@ -232,41 +277,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    #name = args.name
 
-    if not os.path.isdir(f"{PATH}/files/"):
-        os.mkdir(f"{PATH}/files/")
-
-
-    file_paths = download_from_folder(FOLDER_ID, f"{PATH}/files/")
-
-    for file_path in file_paths:
-
-        with zipfile.ZipFile(file_path, "r") as zip_ref:
-            zip_ref.extractall(f"{PATH}/files/")
-
-        name = file_path.split("/")[-1]
-        name = name.split(".")[0]
-
-        if not os.path.isfile(f"{PATH}/files/index.json"):
-            data = {"names": []}
-            with open(f"{PATH}/files/index.json", "w") as f:
-                json.dump(data, f, sort_keys=True, indent=4)
-
-        with open(f"{PATH}/files/index.json", "r") as f:
-            index = json.load(f)
-            if name in index["names"] and not args.force:
-                print(f"Failed to add {name}, a file with the same name as already been added.")
-                print("Pass --force=True to this script to override this")
-                continue
-            else:
-                index["names"].append(name)
-            
-
-            
-        # TODO(agro): fix this so it works with renamed .note files
-        note_data = f"{PATH}/files/{name}/Session.plist" 
-        handwriting_to_anki(note_data, name, deckname=args.deck)
-
-    with open(f"{PATH}/files/index.json", "w") as f:
-        json.dump(index, f)
+    sync_notes(args.deck, args.force)
