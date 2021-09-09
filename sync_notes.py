@@ -1,16 +1,18 @@
 import argparse
-import sys
-import matplotlib.pyplot as plt
-from pathlib import Path
-import os
-import biplist
-import struct
-import zipfile
-import numpy as np
+from itertools import chain
 import json
+import os
+import struct
+import sys
 import urllib.request
+import zipfile
+
+import numpy as np
 import yaml
+
+import matplotlib.pyplot as plt
 from download_files import download_from_folder
+import biplist
 
 PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -116,34 +118,40 @@ def parse_note(sessions_plist_path, q_color, a_color, convert_to_black = CONVERT
     colors = unpack_struct(drawings['curvescolors'], 'B', 1)
     colors = [x/255.0 for x in colors]
     colors = [colors[i:i+4] for i in range(0, len(colors), 4)]
-    xs = points[0::2]
-    ys = points[1::2]
-    x = 0
-    y = 0
+
+    pts = []
+    max_ys = []
     ind = 0
+    for num in num_points:
+        c_pts = points[ind:ind+2*num]
+        ys = c_pts[1::2]
+        pts.append(c_pts)
+        max_ys.append(max(ys))
+        ind += 2*num
+
+    inds = np.argsort(max_ys)
+    pts = [pts[i] for i in inds]
+    colors = [colors[i] for i in inds]
+
     q_curves = []
     a_curves = []
     curr_q_curve = []
     curr_a_curve = []
     last_type = "T"
-    for i, curve_len in enumerate(num_points):
-        color = colors[i]
-        max_x = x + curve_len
-        max_y = y + curve_len
-        max_ind = ind + curve_len*2
+
+    for curve, color in zip(pts, colors):
         if np.all(np.isclose(color, q_color)):
-            # question
             if last_type == "A":
                 a_curves.append(curr_a_curve)
                 curr_a_curve = []
-            curr_q_curve.append(points[ind:max_ind])
+            curr_q_curve.append(curve)
             last_type = "Q"
         elif np.all(np.isclose(color, a_color)):
             # answer
             if last_type == "Q":
                 q_curves.append(curr_q_curve)
                 curr_q_curve = []
-            curr_a_curve.append(points[ind:max_ind])
+            curr_a_curve.append(curve)
             last_type = "A"
         else:
             if last_type == "Q":
@@ -153,9 +161,6 @@ def parse_note(sessions_plist_path, q_color, a_color, convert_to_black = CONVERT
                 a_curves.append(curr_a_curve)
                 curr_a_curve = []
             last_type = "T"
-        current_x = max_x
-        current_y = max_y
-        ind = max_ind
     if last_type == "Q":
         q_curves.append(curr_q_curve)
     elif last_type == "A":
