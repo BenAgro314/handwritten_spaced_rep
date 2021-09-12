@@ -1,7 +1,7 @@
-question_color: color3 # color_name in colors.yaml
-answer_color: color7 # color_name in colors.yaml
+question_color: color29 # color_name in colors.yaml
+answer_color: color26 # color_name in colors.yaml
 cloze_color: color0 # color_name in colors.yaml (TODO)
-target_deck: "default"
+target_deck: "Main Deck"
 # convert any input handwriting to black
 convert_to_black: True
 folder_id: 1OGXYHdwYZICg-1NhTZFVpXBngDfunTsp

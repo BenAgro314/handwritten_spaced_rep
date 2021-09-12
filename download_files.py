@@ -1,8 +1,8 @@
+import os
+import sys
+
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-import os
-
-
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 gauth = GoogleAuth(settings_file = f"{DIR_PATH}/auth/settings.yaml")
@@ -24,13 +24,16 @@ def download_from_folder(folder_id, save_dir_path, extension = ".note", verbose 
     ).GetList()
     downloaded = []
     for file1 in file_list:
+        title = file1['title']
+        print(f"Saw {title}")
         if file1['id'] in ignore_ids:
             continue
-        title = file1['title']
         if verbose:
             print(f'Downloading {title} to {save_dir_path + title}')
         file2 = drive.CreateFile({"id": file1["id"]})
         file2.GetContentFile(save_dir_path + title)
+        if not os.path.isdir(save_dir_path):
+            os.mkdir(save_dir_path)
         downloaded.append(
             {
                 "path": save_dir_path + title,
@@ -42,4 +45,4 @@ def download_from_folder(folder_id, save_dir_path, extension = ".note", verbose 
     return downloaded
 
 if __name__ == "__main__":
-    download_from_folder("1OGXYHdwYZICg-1NhTZFVpXBngDfunTsp", "./files")
+    download_from_folder("1OGXYHdwYZICg-1NhTZFVpXBngDfunTsp", os.join(DIR_PATH, "files"))

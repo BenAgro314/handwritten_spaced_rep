@@ -204,6 +204,7 @@ def plot_curve(name, curve, color, scale_factor = 8.5/574):
         )
     plt.axis('off')
     plt.savefig(name, dpi = 200, bbox_inches='tight', pad_inches=0)
+    plt.close()
     #plt.show()
 
 
@@ -225,7 +226,7 @@ def sync_notes(target_deck = TARGET_DECK, force = False):
     except:
         print("Corrupt index.json, overwriting")
 
-    ignore_ids = [] if force else index["file_ids"]
+    ignore_ids = [] if force else [i[1] for i in index["file_ids"]]
     file_paths = download_from_folder(FOLDER_ID, f"{PATH}/files/", ignore_ids = ignore_ids)
 
     for file_info in file_paths:
@@ -233,15 +234,15 @@ def sync_notes(target_deck = TARGET_DECK, force = False):
         file_path = file_info["path"]
         file_id = file_info["id"]
 
-        name = file_path.split("/")[-1]
-        name = name.split(".")[0]
+        name = os.path.split(file_path)[1]
+        name = os.path.splitext(name)[0]
 
         if file_id in index["file_ids"] and not force:
             print(f"Ignoring {name}, a file with the same id has already been added")
             print(f"Pass --force=True to sync all files")
             continue
         else:
-            index["file_ids"].append(file_id)
+            index["file_ids"].append((name, file_id))
 
         with zipfile.ZipFile(file_path, "r") as zip_ref:
             zip_ref.extractall(f"{PATH}/files/")

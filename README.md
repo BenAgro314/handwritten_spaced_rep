@@ -23,6 +23,8 @@ TODO
 
 ## TODO
 
+- Support the inclusion of images
+- All for users to draw colored boxes around the text that they want to be included
 - Finish readme with better documentation
 - Chrome extension that will scrape notabilities backup to google chrome an automattically add anki files
 - Better UI allowing users to choose how cards are added and to which deck

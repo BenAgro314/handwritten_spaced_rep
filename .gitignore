@@ -10,3 +10,6 @@ client_secrets.json
 auth/token.txt
 retired/
 index.json
+build/
+dist/
+files/
