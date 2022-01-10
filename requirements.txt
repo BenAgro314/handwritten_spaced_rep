@@ -2,3 +2,4 @@ biplist
 PyYAML
 PyDrive2
 matplotlib
+pip install pyparsing==2.4.2
